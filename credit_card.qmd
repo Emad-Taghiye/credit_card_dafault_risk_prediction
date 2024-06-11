@@ -1,0 +1,432 @@
+---
+title: "Credit Card Prediction"
+format: 
+  html:
+    css: styles.css
+---
+
+
+## Loding Libraries
+
+```{r message=FALSE}
+# Check which libraries are not needed
+library(knitr)
+library(dplyr)
+library(plotly)
+library(forcats)
+library(ggcorrplot)
+library(ggplot2)
+library(ROSE)
+library(caret)
+library(randomForest)
+library(xgboost)
+library(class)
+library(smotefamily)
+library(corrplot)
+
+```
+
+## Reading Data
+
+We first read the data. This data set is provided in training and test data sets.
+
+```{r}
+test_data <- read.csv('./test_data.csv', na.strings = "")
+train_data <- read.csv('./train_data.csv', na.strings = "")
+```
+
+To have a larger dataset and have a more freedome to work with the data, we cobmine the training and test sets.
+
+```{r}
+credit_card <- rbind(test_data, train_data)
+summary(credit_card)
+
+numeric_columns <- credit_card[, sapply(credit_card, is.numeric)]
+
+# Calculate the standard deviation for each numerical column
+apply(numeric_columns, 2, sd)
+```
+
+## Understanding Data
+
+Now we are trying to get a feel of the data.
+
+```{r}
+cat("Dimension =", dim(credit_card),'\n')
+kable(head(credit_card))
+kable(tail(credit_card))
+kable(summary(credit_card))
+```
+
+We check the data for the null values.
+
+```{r}
+null_val <- sapply(credit_card, function(x) sum(is.na(x)))
+kable(t(null_val))
+```
+
+As we can see Job.title is the sole null value holder with 11323 null values which are the one third of Job.title's total values. Therefore, we prefer to get rid of this column.
+
+```{r}
+credit_card <- select(credit_card, -Job.title)
+```
+
+## Data Virtualization
+In this section, we will visualize the outcome (Is.High.risk) and the features that seem most relevant to the outcome.
+
+```{r}
+par(mfrow = c(2, 2))
+
+counts <- table(credit_card$Is.high.risk)
+barplot(counts,
+        main = "Distribution of Risk",
+        xlab = "Risk",
+        ylab = "Frequency",
+        col = "lightblue",
+        names.arg = c("Low Risk", "High Risk"))
+
+hist(credit_card$Employment.length,
+        main = "Distributtion of Employment Length",
+        xlab = "Employment Length",
+        ylab = "Frequency",
+        col = "lightblue")
+
+hist(credit_card$Age,
+        main = "Distributtion of Age",
+        xlab = "Age",
+        ylab = "Frequency",
+        col = "lightblue")
+
+hist(credit_card$Account.age,
+        main = "Distribution of Account Age",
+        xlab = "Age",
+        ylab = "Frequency",
+        col = "lightblue")
+```
+
+```{r}
+boxplot(credit_card$Income ~ credit_card$Gender,
+main="Income Distribution VS Gender",
+xlab = "Gender",
+ylab = "Income")
+```
+
+```{r}
+# Check label
+unique(credit_card$Education.level)
+credit_card$Education.level <- factor(credit_card$Education.level,
+                                     levels = c("Secondary / secondary special", "Higher education", "Incomplete higher", "Lower secondary", "Academic degree"),
+                                     labels = c("Sec. Spec.", "Higher Edu.", "Incomplete", "Lower Sec.", "Academic"))
+boxplot(credit_card$Income ~ credit_card$Education.level,
+main="Income Distribution VS Education Level",
+xlab = "Education Level",
+ylab = "Income")
+```
+
+```{r}
+# Check label
+credit_card$Marital.status <- factor(credit_card$Marital.status,
+                                     levels = c("Civil marriage", "Married", "Separated", "Single / not married", "Widow"),
+                                     labels = c("Civil", "Married", "Sep.", "Single", "Widow"))
+boxplot(credit_card$Age~ credit_card$Marital.status,
+main="Age Distribution VS Marital Status",
+xlab = "Marital Status",
+ylab = "Age")
+```
+
+```{r}
+colorscale <- list(
+  list(0, 'blue'),
+  list(1, 'orange')
+)
+
+fig <- plot_ly(
+  type = 'splom',
+  dimensions = list(
+    list(label = 'Income', values = credit_card$Income),
+    list(label = 'Age', values = credit_card$Age),
+    list(label = 'Account age', values = credit_card$Account.age)
+  ),
+  marker = list(
+    color = credit_card$Is.high.risk,
+    colorscale = colorscale,
+    showscale = TRUE
+  )
+)
+
+fig <- fig %>% layout(
+  title = 'Pairplot of Select Features',
+  dragmode = 'select',
+  hovermode = 'closest'
+)
+
+fig
+```
+
+```{r}
+columns_to_encode <- c('Gender', 'Has.a.car', 'Has.a.property', 'Employment.status', 
+                       'Education.level', 'Marital.status', 'Dwelling', 'Family.member.count')
+
+# Encode each column
+for (column in columns_to_encode) {
+  credit_card[[column]] <- as.numeric(factor(credit_card[[column]]))
+}
+
+kable(head(credit_card))
+```
+
+```{r}
+# print(str(credit_card))
+numeric <- select(credit_card, -Has.a.mobile.phone)
+correlation_matrix <- cor(numeric)
+corrplot(correlation_matrix, method = "circle")
+```
+
+```{r}
+credit_card <- select(credit_card, -ID, -Has.a.mobile.phone, -Has.a.phone, -Children.count, -Age, -Family.member.count)
+```
+
+```{r}
+
+correlation_matrix <- cor(credit_card)
+corrplot(correlation_matrix, method = "circle")
+```
+
+```{r}
+kable(head(credit_card))
+```
+
+```{r}
+X <- select(credit_card, -Is.high.risk)
+y <- select(credit_card, Is.high.risk)
+```
+
+```{r}
+kable(head(X))
+print(table(y))
+```
+
+```{r}
+#| warning: false
+ggplot(y, aes(x = `Is.high.risk`)) +
+  geom_histogram(stat = "count", fill = "blue", color = "black") +
+  ggtitle("Distribution of High Risk Individuals") +
+  xlab("Is High Risk") +
+  ylab("Count") +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 15),
+    plot.margin = unit(c(1, 1, 1, 1), "cm")
+  )
+```
+
+```{r}
+#| warning: false
+set.seed(10)
+# resampled_data <- ROSE(Is.high.risk ~ ., data = credit_card, N = 2*nrow(credit_card), p = 0.5)$data
+
+# smote_result/ <- SMOTE(X, y$Is.high.risk, K = 5, dup_size = 1)
+# s <- data.frame(smote_result$data, Is.high.risk = smote_result$target)
+
+# print(table())
+
+# resampled_data <- resampled_data[sample(nrow(resampled_data)),]
+adasyn_data <- ADAS(X, y, K = 5)
+balanced_data <- adasyn_data$data
+names(balanced_data)[names(balanced_data) == "class"] <- "Is.high.risk"
+balanced_data <- balanced_data[sample(nrow(balanced_data)), ]
+print(head(balanced_data))
+table(balanced_data$Is.high.risk)
+resampled_data <- balanced_data
+print(resampled_data$Index)
+
+X_resampled<- select(resampled_data, -Is.high.risk)
+y_resampled <- select(resampled_data, Is.high.risk)
+
+print(head(y_resampled))
+
+# Print class distribution
+print(table(y_resampled$Is.high.risk))
+
+ggplot(y_resampled, aes(x = `Is.high.risk`)) +
+  geom_histogram(stat = "count", fill = "blue", color = "black") +
+  ggtitle("Distribution of High Risk Individuals") +
+  xlab("Is High Risk") +
+  ylab("Count") +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 15),
+    plot.margin = unit(c(1, 1, 1, 1), "cm")
+  )
+```
+
+```{r}
+#| warning: false
+
+# Does the oreder of 0s ad 1s matter?
+# set.seed(123)
+data <- cbind(X_resampled, y_resampled)
+
+train_size <- 0.7
+trainIndex <- createDataPartition(data$Is.high.risk, p = train_size, list = FALSE)
+
+X_train <- data[trainIndex, -ncol(data)]
+y_train <- data[trainIndex, ncol(data), drop=FALSE]
+X_test <- data[-trainIndex, -ncol(data)]
+y_test <- data[-trainIndex, ncol(data), drop=FALSE]
+```
+
+```{r}
+head(y_train)
+table(y_train)
+```
+
+```{r}
+X_train <- scale(X_train)
+train_mean <- attr(X_train, "scaled:center")
+train_sd <- attr(X_train, "scaled:scale")
+X_test <- scale(X_test, center = train_mean, scale = train_sd)
+print(dim(y_train))
+
+cat('Shape for training data: (', paste(dim(X_train), collapse = ', '), '), (', paste(dim(y_train), collapse = ', '), ')', '\n')
+cat('Shape for testing data: (', paste(dim(X_test), collapse = ', '), '), (', paste(dim(y_test), collapse = ', '), ')', '\n')
+```
+
+
+```{r}
+#| warning: false
+
+# Combine X_train and y_train into a single data frame for training
+trainData <- cbind(X_train, Is.high.risk = y_train)
+testData <- cbind(X_test, Is.high.risk = y_test)
+
+trainDataLogestic <- trainData
+
+trainDataLogestic$Is.high.risk <- as.factor(trainDataLogestic$Is.high.risk)
+
+fit <- glm(Is.high.risk ~ ., data = trainDataLogestic, family = binomial)
+summary(fit)
+pred <- predict(fit, type="response") > 0.5
+table <-table(ifelse(pred, 1, 0), trainDataLogestic$Is.high.risk)
+
+print(table)
+acc_logistic <- sum(diag(table))/sum(table)
+acc_logistic
+```
+
+```{r}
+
+# set.seed(123)
+trainData$Is.high.risk <- as.factor(trainData$Is.high.risk)
+testData$Is.high.risk <- as.factor(testData$Is.high.risk)
+# testData$Is.high.risk <- as.factor(testData$as.high.risk)
+fit <- randomForest(Is.high.risk ~ ., 
+                    data = trainData, 
+                    ntree = 300, 
+                    maxnodes = 15, 
+                    mtry = 2, 
+                    importance = TRUE)
+
+rf_predictions_train <- predict(fit, newdata = X_train)
+# rf_predictions_train <- ifelse(rf_predictions_train, 1, 0)
+rf_predictions_test <- predict(fit, newdata = X_test)
+# rf_predictions_test <- ifelse(rf_predictions_test, 1, 0)
+
+asc_train <- sum(rf_predictions_train == trainData$Is.high.risk) / nrow(trainData)
+asc_test <- sum(rf_predictions_test == testData$Is.high.risk) / nrow(testData)
+
+print(paste("Accuracy Score for training data is:", asc_train))
+print(paste("Accuracy Score for test data is:", asc_test))
+
+table <-table(rf_predictions_train, trainData$Is.high.risk)
+table
+sum(diag(table))/sum(table)
+
+table <-table(rf_predictions_test, testData$Is.high.risk)
+table
+acc_rf <- sum(diag(table))/sum(table)
+acc_rf
+```
+
+```{r}
+# set.seed(123)
+# Train the model using the xgboost function
+
+fit <- xgboost(
+  data = X_train,
+  label = y_train$Is.high.risk,
+  objective = "binary:logistic",
+  eta = 0.03,
+  max_depth = 2,
+  subsample = 0.8,
+  colsample_bytree = 0.9,
+  eval_metric = "auc",
+  nrounds = 1000,
+  early_stopping_rounds = 50,
+  verbose = 0
+)
+
+xgb_pred_train <- ifelse(predict(fit, X_train) > 0.6, 1, 0)
+
+xgb_pred_test <- ifelse(predict(fit, X_test) > 0.6, 1, 0)
+
+table <-table(ifelse(xgb_pred_train, 1, 0), trainData$Is.high.risk)
+table
+sum(diag(table))/sum(table)
+
+table <-table(ifelse(xgb_pred_test, 1, 0), testData$Is.high.risk)
+table
+acc_xgb <- sum(diag(table))/sum(table)
+acc_xgb
+
+importance_matrix <- xgb.importance(feature_names = colnames(X_train), model = fit)
+print(importance_matrix)
+xgb.plot.importance(importance_matrix)
+```
+
+```{r}
+# set.seed(123)
+fit <- knn(train = X_train, test = X_test, cl = y_train$Is.high.risk, k = 13)
+acc_knn <- mean(fit == y_test$Is.high.risk)
+acc_knn
+
+table <-table(fit, y_test$Is.high.risk)
+table
+```
+
+```{r}
+# Plotting accuracy comparison
+model_names <- c('Logistic Regression', 'Random Forest Classifier', 'XGB Classifier', 'KNN Classifier')
+accuracy_scores <- c(round(acc_logistic, 2)*100,
+                      round(acc_rf, 2)*100,
+                      round(acc_xgb, 2)*100,
+                      round(acc_knn, 2)*100
+                      ) 
+
+
+data <- data.frame(Model = factor(model_names, levels = model_names), Accuracy_Score = accuracy_scores)
+
+colors <- c('Logistic Regression' = '#E7B8B8', 'Random Forest Classifier' = '#B8E7B8', 
+            'XGB Classifier' = '#B8B8E7', 'KNN Classifier' = '#E7E7B8')
+
+fig <- ggplot(data, aes(x = Model, y = Accuracy_Score, fill = Model)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0(Accuracy_Score, "%")), vjust = -0.5) +
+  scale_fill_manual(values = colors) +
+  labs(title = "Comparison of Model Accuracy", x = "Model", y = "Accuracy Score") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none"
+  ) +
+  coord_cartesian(ylim = c(0, 100)) +
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm")) +
+  theme(plot.title = element_text(size = 20))
+
+
+print(fig)
+```
