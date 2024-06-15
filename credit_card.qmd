@@ -25,6 +25,21 @@ library(smotefamily)
 library(corrplot)
 
 ```
+## Motivation
+Credit card defaults pose significant risks to financial institutions, leading to substantial losses and operational challenges. To mitigate these issues, a data science model for predicting default risk is essential. In this work, we will implement and compare four different models to help financial institutions manage credit risk more effectively using their preferred model.
+
+## Usage
+The results can be used for:
+
+1. Helping financial institutions to manage credit risk more effectively
+2. Guiding future data collection and risk assessment strategies.
+3. Facilitating responsible lending practices
+
+## Questions
+
+1. How accurately a Machine Learning model can predict credit default risk and identify individuals as either high risk or low risk?
+2. How different models fair in predicting the credit default risk?
+
 
 ## Reading Data
 
@@ -39,40 +54,65 @@ To have a larger dataset and have a more freedome to work with the data, we cobm
 
 ```{r}
 credit_card <- rbind(test_data, train_data)
-summary(credit_card)
-
-numeric_columns <- credit_card[, sapply(credit_card, is.numeric)]
-
-# Calculate the standard deviation for each numerical column
-apply(numeric_columns, 2, sd)
 ```
 
-## Understanding Data
+## Data Overview
 
-Now we are trying to get a feel of the data.
+The data set is named Credit Car Prediction and downloaded from [kaggl.com](https://www.kaggle.com/datasets/tanayatipre/car-price-prediction-dataset). It is specifically created to assess the risk level for lending puproses. The dataset is a mix of continuous, categorical, and binary variables. Plus, our target variable (Is High Risk) is also a binary varible which we can use for classification modelings. Let's look at the data closely:
 
 ```{r}
 cat("Dimension =", dim(credit_card),'\n')
+```
+As it is evidant from the above output, the dataset has 20 features and 36475 observations.
+
+THe feature list is as the following:
+
+| Variables | Description |
+|----------|----------|
+| ID | Unique identifier for each individual |
+| Gender | Gender of the individual (Male/Female) |
+| Has a car | Whether the individual owns a car (Yes/No)|
+| Has a property | Whether the individual owns property (Yes/No) |
+| Children count| Number of children the individual has |
+| Income | Income of the individual |
+| Employment status | Current employment status of the individual |
+| Education level | Highest level of education attained by the individual |
+| Marital status | Marital status of the individual |
+| Dwelling | Type of dwelling the individual resides in |
+| Age | Age of the individual |
+| Employment length | Length of time the individual has been employed |
+| Has a mobile phone | Whether the individual has a mobile phone (Yes/No) |
+| Has a work phone | Whether the individual has a work phone (Yes/No) |
+| Has a phone | Whether the individual has a phone (Yes/No) |
+| Has an email | Whether the individual has an email (Yes/No) |
+| Job title | Title of the individual's job |
+| Family member count | Number of family members the individual has |
+| Account age | Age of the individual's account |
+| Is high risk | Target variable indicating whether the individual is considered high risk for credit card eligibility (0/1) |
+
+The head, tail, and the summary of features are as the following:
+```{r}
 kable(head(credit_card))
 kable(tail(credit_card))
 kable(summary(credit_card))
 ```
+From the above summary, we can extract valuable insights. However, due to some features being categorical, a portion of the results are not shown. We return back to analyzing this summary again after encoding the categorical variables.
 
-We check the data for the null values.
+Let's check whether our dataset contains null values:
 
 ```{r}
 null_val <- sapply(credit_card, function(x) sum(is.na(x)))
 kable(t(null_val))
 ```
 
-As we can see Job.title is the sole null value holder with 11323 null values which are the one third of Job.title's total values. Therefore, we prefer to get rid of this column.
+As we can see "Job Title" is the sole null value holder with 11323 null values which are the one third of Job Title's total values. So, we drop this column entirely. This is one of the preprocessing steps. However, to make our data visualizations more convenient, we removed the null value holders sooner.
 
 ```{r}
 credit_card <- select(credit_card, -Job.title)
 ```
 
-## Data Virtualization
-In this section, we will visualize the outcome (Is.High.risk) and the features that seem most relevant to the outcome.
+## Data Virtualization And Preprocessing
+In this section, we will visualize the outcome (Is High Risk) and the features that seem most relevant to the outcome as well as preprocessing the data. The preprocessing steps are including handling missing values, feature selection, encoding catagorical variables,handling imbalanced data, spliting the dataset into training and test sets, standardizing the data.
 
 ```{r}
 par(mfrow = c(2, 2))
@@ -103,7 +143,12 @@ hist(credit_card$Account.age,
         ylab = "Frequency",
         col = "lightblue")
 ```
+From these figures we can understand: 
 
+1. The target variable (Is High Risk) is highly unbalanced. We need to take care of it before implementing our models. 
+2. we have two long bars in the distribution of employment length figure. This is indicating that most people are new to thir jobs with and a portion of indivisuals have had their jobs for a quite long time. All other employment lengths have a similar frequencies. 
+3. The distribution of age chart is mostly a normal distribution with some skews at the right side of it. These are indicating that most applicants are middle aged and are placed in the range of 41 to 49 years of age. 
+4. The distribution of account age shows that the data is more skewed on the right side meaning most accounts are new. 
 ```{r}
 boxplot(credit_card$Income ~ credit_card$Gender,
 main="Income Distribution VS Gender",
@@ -111,9 +156,9 @@ xlab = "Gender",
 ylab = "Income")
 ```
 
+This boxplot is suggesting while male applicant are getting higher income on average, there is not much of difference between average income of males and females. 
+
 ```{r}
-# Check label
-unique(credit_card$Education.level)
 credit_card$Education.level <- factor(credit_card$Education.level,
                                      levels = c("Secondary / secondary special", "Higher education", "Incomplete higher", "Lower secondary", "Academic degree"),
                                      labels = c("Sec. Spec.", "Higher Edu.", "Incomplete", "Lower Sec.", "Academic"))
@@ -122,6 +167,8 @@ main="Income Distribution VS Education Level",
 xlab = "Education Level",
 ylab = "Income")
 ```
+
+The income distribution versus education level boxplot shows that with a better education level, people are getting better incomes on average. However, there are some exceptions. For instance, we can see quite a few outliers for higher education which indicates that some people who has higher education receive better income compared to applicans with other level of education. Plus, we can see although the median of the income for academic degree is above all other education levels, its variability is less than them with no outliers at all.
 
 ```{r}
 # Check label
@@ -133,6 +180,8 @@ main="Age Distribution VS Marital Status",
 xlab = "Marital Status",
 ylab = "Age")
 ```
+
+This boxplot is indicating that single people consitute a wider range of age with mostly young people, and widows are mosly old with some younger outliers. All other marital statuses are place between these two.
 
 ```{r}
 colorscale <- list(
@@ -163,6 +212,10 @@ fig <- fig %>% layout(
 fig
 ```
 
+The pairplot shows a strong positive correlation between income and account age, while income and age, as well as account age and age, show scattered distributions with no clear linear relationship. Plus, the data contains some outliers, particularly in income.
+
+Now, we try to encode the categorical columns.
+
 ```{r}
 columns_to_encode <- c('Gender', 'Has.a.car', 'Has.a.property', 'Employment.status', 
                        'Education.level', 'Marital.status', 'Dwelling', 'Family.member.count')
@@ -175,17 +228,30 @@ for (column in columns_to_encode) {
 kable(head(credit_card))
 ```
 
+Let's see the summary of features again and extract insights from it.
+
 ```{r}
-# print(str(credit_card))
+kable(summary(credit_card))
+```
+
+The summary reveals that 33% of applicants are male, 38% have a car, they are getting 186k on average, and the average account age is 26 months.
+
+To improve model performance, simplifying the model, and enhnace the data quality (e.g. removing the noise), we will do feature selection based on the correclation matrix. To start this process, we draw the correclation plot and remove the variables that are not correlated with any other features, specially the target variable. We also remove one of two variables that are highly correlated with each other.
+
+```{r}
 numeric <- select(credit_card, -Has.a.mobile.phone)
 correlation_matrix <- cor(numeric)
 corrplot(correlation_matrix, method = "circle")
 ```
 
+By analyzing the above correlation matrix, we decided to remove "ID", "Has a mobile Phone", "Has a Phone", "Children Count", and "Age".
+
 ```{r}
-credit_card <- select(credit_card, -ID, -Has.a.mobile.phone, -Has.a.phone, -Children.count, -Age, -Family.member.count)
+credit_card_all <- select(credit_card, -Has.a.mobile.phone)
+credit_card <- select(credit_card, -ID, -Has.a.mobile.phone, -Has.a.phone, -Children.count, -Age)
 ```
 
+After this process the correlation matrix, and our dataset will be turned into the following figures. As you can see, there is no more high correlation between features of the dataset.
 ```{r}
 
 correlation_matrix <- cor(credit_card)
@@ -196,15 +262,25 @@ corrplot(correlation_matrix, method = "circle")
 kable(head(credit_card))
 ```
 
+Now, we devide our dataset into the feature and the traget variable.
 ```{r}
 X <- select(credit_card, -Is.high.risk)
 y <- select(credit_card, Is.high.risk)
+
+X_all <- select(credit_card_all, -Is.high.risk)
+y_all <- select(credit_card_all, Is.high.risk)
 ```
 
+The head of the feature variables dataset is as teh following:
 ```{r}
 kable(head(X))
+```
+For the convenience, let's see the table of the target variable.
+```{r}
 print(table(y))
 ```
+
+The output above reveals that the target variable is highly unbalanced. The following distribution plot shows it better:
 
 ```{r}
 #| warning: false
@@ -222,33 +298,42 @@ ggplot(y, aes(x = `Is.high.risk`)) +
   )
 ```
 
+To solve this issue, we are using ADAS (Adaptive Synthetic). It is a technique derived from SMOTE and is designed to address class imbalance by generating synthetic minority class examples. To give our data more variability, we shuffled the data after this step. This way, we decreased the possibility of our model to learn from the order of the observations.
+
 ```{r}
 #| warning: false
+
+# For the feature selected dataset
 set.seed(10)
-# resampled_data <- ROSE(Is.high.risk ~ ., data = credit_card, N = 2*nrow(credit_card), p = 0.5)$data
-
-# smote_result/ <- SMOTE(X, y$Is.high.risk, K = 5, dup_size = 1)
-# s <- data.frame(smote_result$data, Is.high.risk = smote_result$target)
-
-# print(table())
-
-# resampled_data <- resampled_data[sample(nrow(resampled_data)),]
 adasyn_data <- ADAS(X, y, K = 5)
 balanced_data <- adasyn_data$data
 names(balanced_data)[names(balanced_data) == "class"] <- "Is.high.risk"
 balanced_data <- balanced_data[sample(nrow(balanced_data)), ]
-print(head(balanced_data))
-table(balanced_data$Is.high.risk)
 resampled_data <- balanced_data
-print(resampled_data$Index)
+kable(head(resampled_data))
+table(resampled_data$Is.high.risk)
 
+
+# For the original dataset
+adasyn_data <- ADAS(X_all, y_all, K = 5)
+balanced_data <- adasyn_data$data
+names(balanced_data)[names(balanced_data) == "class"] <- "Is.high.risk"
+balanced_data <- balanced_data[sample(nrow(balanced_data)), ]
+resampled_data_all <- balanced_data
+```
+This table output suggest that the target variable is completely balanced now.
+
+Now, we draw the distribution of high risk indivisuals plot again to see how the data has gotten balanced with our own eyes too.
+```{r}
+#| warning: false
+
+# Feature selected
 X_resampled<- select(resampled_data, -Is.high.risk)
 y_resampled <- select(resampled_data, Is.high.risk)
 
-print(head(y_resampled))
-
-# Print class distribution
-print(table(y_resampled$Is.high.risk))
+# Original Data
+X_resampled_all<- select(resampled_data_all, -Is.high.risk)
+y_resampled_all <- select(resampled_data_all, Is.high.risk)
 
 ggplot(y_resampled, aes(x = `Is.high.risk`)) +
   geom_histogram(stat = "count", fill = "blue", color = "black") +
@@ -264,37 +349,106 @@ ggplot(y_resampled, aes(x = `Is.high.risk`)) +
   )
 ```
 
+The next step is splitting the dataset into the training and test sets. We are using a split of 70% for this purpose.
 ```{r}
 #| warning: false
-
-# Does the oreder of 0s ad 1s matter?
-# set.seed(123)
-data <- cbind(X_resampled, y_resampled)
-
+#| 
 train_size <- 0.7
-trainIndex <- createDataPartition(data$Is.high.risk, p = train_size, list = FALSE)
+# Feature selected data
+trainIndex <- createDataPartition(resampled_data$Is.high.risk, p = train_size, list = FALSE)
 
-X_train <- data[trainIndex, -ncol(data)]
-y_train <- data[trainIndex, ncol(data), drop=FALSE]
-X_test <- data[-trainIndex, -ncol(data)]
-y_test <- data[-trainIndex, ncol(data), drop=FALSE]
+X_train <- resampled_data[trainIndex, -ncol(resampled_data)]
+y_train <- resampled_data[trainIndex, ncol(resampled_data), drop=FALSE]
+X_test <- resampled_data[-trainIndex, -ncol(resampled_data)]
+y_test <- resampled_data[-trainIndex, ncol(resampled_data), drop=FALSE]
+
+# Original data
+trainIndex_all <- createDataPartition(resampled_data_all$Is.high.risk, p = train_size, list = FALSE)
+
+X_train_all <- resampled_data_all[trainIndex_all, -ncol(resampled_data_all)]
+y_train_all <- resampled_data_all[trainIndex_all, ncol(resampled_data_all), drop=FALSE]
+X_test_all <- resampled_data_all[-trainIndex_all, -ncol(resampled_data_all)]
+y_test_all <- resampled_data_all[-trainIndex_all, ncol(resampled_data_all), drop=FALSE]
 ```
 
+To be assured about all the features contribute equally to the models, we scale the each feature using its specific mean and standard deviation.
 ```{r}
-head(y_train)
-table(y_train)
-```
-
-```{r}
+# Selected features data
 X_train <- scale(X_train)
 train_mean <- attr(X_train, "scaled:center")
 train_sd <- attr(X_train, "scaled:scale")
 X_test <- scale(X_test, center = train_mean, scale = train_sd)
-print(dim(y_train))
 
 cat('Shape for training data: (', paste(dim(X_train), collapse = ', '), '), (', paste(dim(y_train), collapse = ', '), ')', '\n')
 cat('Shape for testing data: (', paste(dim(X_test), collapse = ', '), '), (', paste(dim(y_test), collapse = ', '), ')', '\n')
+
+# Original data
+X_train_all <- scale(X_train_all)
+train_mean_all <- attr(X_train_all, "scaled:center")
+train_sd_all <- attr(X_train_all, "scaled:scale")
+X_test_all <- scale(X_test_all, center = train_mean_all, scale = train_sd_all)
 ```
+
+## Models
+We are using the following four models for this project:
+
+- Logistic Regression
+- Random Forest Classification
+- XGBoost Classification
+- KNN Classification
+
+For each model, we will use two datasets. The first dataset is the dataset with all the predicators and the second one is the dataset which we removed a portion of the origianl predicators in the last section. The goal is to determine which model performs best for our specific question. The parameters for each model are optimized through fine-tuning and exploring various combinations.
+
+Before fitting our models, let's write a function to return important performance metrics of the models. This function is from the example project report provided to us. It receives the confusion matrix as the input and returns accuracy, precision, recall, and F1 score metrics as the outputs.
+
+```{r}
+performance_metrics = function(confusion_metrics){
+  TP = confusion_metrics[1]
+  FP = confusion_metrics[3]
+  FN = confusion_metrics[2]
+  TN = confusion_metrics[4]
+  accuracy = (TP+TN)/(TP+FP+FN+TN)
+  precision = TP/(TP+FP)
+  recall = TP/(TP+FN)
+  f1 = 2 * ((precision*recall)/(precision+recall))
+  all.metrics  = c('accuracy'=accuracy, 
+                   'precision'=precision, 
+                   'recall'=recall, 
+                   'f1'=f1)
+  
+  for (metric in names(all.metrics)){
+    print(paste(metric, as.numeric(all.metrics[metric]), sep="---->")[1])
+  }
+  
+  return(c(accuracy, precision, recall, f1))
+}
+```
+
+### Logistic Regression
+**Logistic Regression with all the features:**
+
+```{r}
+#| warning: false
+
+# Combine X_train_all and y_train_all into a single data frame for training
+trainData_all <- cbind(X_train_all, Is.high.risk = y_train_all)
+testData_all <- cbind(X_test_all, Is.high.risk = y_test_all)
+
+trainDataLogestic <- trainData_all
+
+trainDataLogestic$Is.high.risk <- as.factor(trainDataLogestic$Is.high.risk)
+
+fit <- glm(Is.high.risk ~ ., data = trainDataLogestic, family = binomial)
+summary(fit)
+pred <- predict(fit, type="response") > 0.5
+table <-table(ifelse(pred, 1, 0), trainDataLogestic$Is.high.risk)
+
+print(table)
+acc_logistic_all <- performance_metrics(table)[1]
+```
+The summary above shows that three predictors have p-values greater than 0.05. This means there is no clear evidence that these predictors are statistically significant. So, their estimates for the response variable cannot be trusted. Plus, the accuracy score for logistic regression is not that good which makes it not an optimal model to predict our future data points.
+
+**Logistic Regression with selected features:**
 
 
 ```{r}
@@ -314,16 +468,53 @@ pred <- predict(fit, type="response") > 0.5
 table <-table(ifelse(pred, 1, 0), trainDataLogestic$Is.high.risk)
 
 print(table)
-acc_logistic <- sum(diag(table))/sum(table)
-acc_logistic
+acc_logistic <- performance_metrics(table)[1]
 ```
+
+The above summary shows that most predictors are statistically significant. Also, the accuracy of the model containing all the variables and the model with selected features are verey similar. These suggest that for the sake of simplifying the model and enhancing the data quality, there is no issue to fit our model with our selected features.
+
+### Random Forest Classifier
+**Random Forest Classifier with all the features:**
 
 ```{r}
 
-# set.seed(123)
+trainData_all$Is.high.risk <- as.factor(trainData_all$Is.high.risk)
+testData_all$Is.high.risk <- as.factor(testData_all$Is.high.risk)
+
+fit <- randomForest(Is.high.risk ~ ., 
+                    data = trainData_all, 
+                    ntree = 300, 
+                    maxnodes = 15, 
+                    mtry = 2, 
+                    importance = TRUE)
+
+rf_predictions_train <- predict(fit, newdata = X_train_all)
+rf_predictions_test <- predict(fit, newdata = X_test_all)
+
+asc_train <- sum(rf_predictions_train == trainData_all$Is.high.risk) / nrow(trainData_all)
+asc_test <- sum(rf_predictions_test == testData_all$Is.high.risk) / nrow(testData_all)
+```
+Metrics of the model for the trainig set:
+```{r}
+table <-table(rf_predictions_train, trainData_all$Is.high.risk)
+table
+acc_rf <- performance_metrics(table)[1]
+```
+
+Metircs of the model for the test set:
+```{r}
+table <-table(rf_predictions_test, testData_all$Is.high.risk)
+table
+acc_rf_all <- performance_metrics(table)[1]
+```
+
+
+**Random Forest Classifier with selected features:**
+```{r}
+
 trainData$Is.high.risk <- as.factor(trainData$Is.high.risk)
 testData$Is.high.risk <- as.factor(testData$Is.high.risk)
-# testData$Is.high.risk <- as.factor(testData$as.high.risk)
+
 fit <- randomForest(Is.high.risk ~ ., 
                     data = trainData, 
                     ntree = 300, 
@@ -332,28 +523,67 @@ fit <- randomForest(Is.high.risk ~ .,
                     importance = TRUE)
 
 rf_predictions_train <- predict(fit, newdata = X_train)
-# rf_predictions_train <- ifelse(rf_predictions_train, 1, 0)
 rf_predictions_test <- predict(fit, newdata = X_test)
-# rf_predictions_test <- ifelse(rf_predictions_test, 1, 0)
 
 asc_train <- sum(rf_predictions_train == trainData$Is.high.risk) / nrow(trainData)
 asc_test <- sum(rf_predictions_test == testData$Is.high.risk) / nrow(testData)
 
-print(paste("Accuracy Score for training data is:", asc_train))
-print(paste("Accuracy Score for test data is:", asc_test))
-
+```
+Metrics of the model for the trainig set:
+```{r}
 table <-table(rf_predictions_train, trainData$Is.high.risk)
+table
+acc_rf <- performance_metrics(table)[1]
+```
+
+Metircs of the model for the test set:
+```{r}
+table <-table(rf_predictions_test, testData$Is.high.risk)
+table
+acc_rf <- performance_metrics(table)[1]
+```
+
+Random Foreset Classifier achieved accuracy of 83%, an accuracy much better than the Logistic Regression. So, it can be a better choice of model for our question. Also, like the Logistic Regression, the accuracy of the model containing all the variables and the model with selected features are verey similar. This suggests that for the sake of simplifying the model and enhancing the data quality, there is no issue to fit our Random Forest Classifier model with our selected features.
+
+### XGBoost Classifier
+**XGBoost Classifier with all the features:**
+
+```{r}
+# Train the model using the xgboost function
+
+fit <- xgboost(
+  data = X_train_all,
+  label = y_train_all$Is.high.risk,
+  objective = "binary:logistic",
+  eta = 0.03,
+  max_depth = 2,
+  subsample = 0.8,
+  colsample_bytree = 0.9,
+  eval_metric = "auc",
+  nrounds = 1000,
+  early_stopping_rounds = 50,
+  verbose = 0
+)
+
+xgb_pred_train <- ifelse(predict(fit, X_train_all) > 0.6, 1, 0)
+
+xgb_pred_test <- ifelse(predict(fit, X_test_all) > 0.6, 1, 0)
+
+table <-table(ifelse(xgb_pred_train, 1, 0), trainData_all$Is.high.risk)
 table
 sum(diag(table))/sum(table)
 
-table <-table(rf_predictions_test, testData$Is.high.risk)
+table <-table(ifelse(xgb_pred_test, 1, 0), testData_all$Is.high.risk)
 table
-acc_rf <- sum(diag(table))/sum(table)
-acc_rf
+acc_xgb_all <- performance_metrics(table)[1]
+
+importance_matrix <- xgb.importance(feature_names = colnames(X_train_all), model = fit)
+xgb.plot.importance(importance_matrix)
 ```
 
+
+**XGBoost Classifier with selected features:**
 ```{r}
-# set.seed(123)
 # Train the model using the xgboost function
 
 fit <- xgboost(
@@ -380,38 +610,60 @@ sum(diag(table))/sum(table)
 
 table <-table(ifelse(xgb_pred_test, 1, 0), testData$Is.high.risk)
 table
-acc_xgb <- sum(diag(table))/sum(table)
-acc_xgb
+acc_xgb <- performance_metrics(table)[1]
 
 importance_matrix <- xgb.importance(feature_names = colnames(X_train), model = fit)
-print(importance_matrix)
 xgb.plot.importance(importance_matrix)
 ```
 
+Again, we are experiencing a massive boost in the accuracy of our model. It seems XGBoost can better fit to our data. Therefore, it will be a better choice for model for our question than the Logistic Regression and Random Forest Classifier models.
+
+Furthermore, like the previous two models, the accuracy of the model containing all the variables and the model with selected features are verey similar. This suggests that for the sake of simplifying the model and enhancing the data quality, there is no issue to fit our XGBoost Classifier model with our selected features. Also, the importance plots of these two datasets are suggesting that most of the removed feature are not as of high importance. 
+
+
+### KNN Classifier
+**KNN Classifier with all the features:**
 ```{r}
-# set.seed(123)
+fit <- knn(train = X_train_all, test = X_test_all, cl = y_train_all$Is.high.risk, k = 13)
+acc_knn_all <- performance_metrics(table)[1]
+
+table <-table(fit, y_test_all$Is.high.risk)
+table
+```
+
+**KNN Classifier with selected features:**
+```{r}
 fit <- knn(train = X_train, test = X_test, cl = y_train$Is.high.risk, k = 13)
-acc_knn <- mean(fit == y_test$Is.high.risk)
-acc_knn
+acc_knn <- performance_metrics(table)[1]
 
 table <-table(fit, y_test$Is.high.risk)
 table
 ```
 
+This time, our model didn't improved much compared to the previous model (XGBoost). However, we achieved the highest accuracy among all the implemented models. Unlike, three previous models, the accuracy of our selected predicators gotten higher than the accuracy of the model with all the selected predicators. This means not only does selecting predicators helps us to simplify the model and enhance the data quality, but also it is a reasonable choice as our model will be more accurate.
+
+## Results
+
 ```{r}
 # Plotting accuracy comparison
-model_names <- c('Logistic Regression', 'Random Forest Classifier', 'XGB Classifier', 'KNN Classifier')
-accuracy_scores <- c(round(acc_logistic, 2)*100,
+model_names <- c('Logistic Regression Selected', 'Logistic Regression Original', 'Random Forest Classifier Selected', 'Random Forest Classifier Original', 'XGB Classifier Selected', 'XGB Classifier Original', 'KNN Classifier Selected', 'KNN Classifier Original')
+accuracy_scores <- c(
+                      round(acc_logistic, 2)*100,
+                      round(acc_logistic_all, 2)*100,
                       round(acc_rf, 2)*100,
+                      round(acc_rf_all, 2)*100,
                       round(acc_xgb, 2)*100,
-                      round(acc_knn, 2)*100
+                      round(acc_xgb_all, 2)*100,
+                      round(acc_knn, 2)*100,
+                      round(acc_knn_all, 2)*100
                       ) 
 
 
 data <- data.frame(Model = factor(model_names, levels = model_names), Accuracy_Score = accuracy_scores)
 
-colors <- c('Logistic Regression' = '#E7B8B8', 'Random Forest Classifier' = '#B8E7B8', 
-            'XGB Classifier' = '#B8B8E7', 'KNN Classifier' = '#E7E7B8')
+colors <- c('Logistic Regression Selected' = '#E7B8B8', 'Logistic Regression Original' = '#F7C8C8',
+            'Random Forest Classifier Selected' = '#B8E7B8', 'Random Forest Classifier Original' = '#C8F7C8', 'XGB Classifier Selected' = '#B8B8E7', 'XGB Classifier Original' = '#C8C8F7',  
+            'KNN Classifier Selected' = '#E7E7B8', 'KNN Classifier Original' = '#F7F7C8')
 
 fig <- ggplot(data, aes(x = Model, y = Accuracy_Score, fill = Model)) +
   geom_bar(stat = "identity") +
@@ -421,12 +673,36 @@ fig <- ggplot(data, aes(x = Model, y = Accuracy_Score, fill = Model)) +
   theme_minimal() +
   theme(
     plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
     legend.position = "none"
   ) +
   coord_cartesian(ylim = c(0, 100)) +
-  theme(plot.margin = unit(c(1, 1, 1, 1), "cm")) +
+  theme(plot.margin = unit(c(1, 1, 1, 1, 1, 1, 1, 1), "cm")) +
   theme(plot.title = element_text(size = 20))
 
 
 print(fig)
 ```
+
+By Looking at the comparison above, we understand that KNN Classification has the highest accuracy (94%) among all of the implemented models with XGBoost closely following behind and Logistic Regression fairs the worst with the accuracy of 62% which is low. Random Forest Classifier accurecy is acceptable, and if we have no other choice it is a good fit for our problem. Thus, by far our second question is answered.
+
+Regarding the first question, we achieved 94% accuracy using KNN Classification. So, the answer is 94%. While this accuracy is high enough, we should keep in mind that we have not done many data sciecne techniques like cross validation, regularization techniques etc on our data. Thus, this project has more capacity for improvements and achieving a higher accuracy.
+
+## Impact
+There are two major impacts for this work:
+1. The insights gained from the model can help financial institutions manage credit risk more effectively, enabling better decision-making in loan approvals.
+2. These findings can guide future data collection and risk assessment strategies, ensuring more accurate predictions and improved financial stability.
+
+## Limitations
+
+This work has three major limiations:
+
+1. The sample size is very small. So, even if the accuracy of our model is high enough, it might not cover all applicants which limits the model's generalizability. A larger sample size is suggested for similar works.
+
+2. Some important features, like credit score, are missing from the dataset. This might result in incomplete insights, affecting the models' accuracy and reliability. It is better for the model to incorporate additional features in it.
+
+3. The models were trained on historical data. So, they might not capture future trends of data. As a result, we are suggesting to implement the models in a real-world setting and continuously monitor rheir performance.
+
+## Conclusion
+In this work, we classified credit card borrowers as high risk or low risk, using four Machine Learning models of Logistic Regression, Random Forest Classfier, XGBoost Classifier, and KNN Classifier. We merged the original training and test sets, handled missing values, encoded categorical variables, and balanced the target variable. After some virtualizations to help us interpret the model better, we applied our models and evaluated them using metrics such as confusion matrix, accuracy, recall and precision. The results proved that KNN outperforms other models with the highest accuracy. So, for this work KNN will be our suggested model for predicting credit default risk assessment.
+
