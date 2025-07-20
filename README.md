@@ -51,7 +51,7 @@ quarto::quarto_render("credit_card.qmd")
 ## Models Compared
 
 | Model               | Accuracy (All Features) | Accuracy (Selected Features) |
-|---------------------|-------------------------|------------------------------|
+|--------------------|------------------------|----------------------------|
 | Logistic Regression | 62%                     | 62%                          |
 | Random Forest       | 99%                     | 99%                          |
 | XGBoost             | 93%                     | 91%                          |
@@ -89,5 +89,5 @@ These findings reinforce the importance of preprocessing, careful model selectio
 ## Author
 
 **Emad Taghiye**\
-Ph.D. Student, University of Oregon\
-[etaghiye\@uoregon.edu](mailto:etaghiye@uoregon.edu){.email}
+MS Student, University of Oregon\
+etaghiye\@uoregon.edu
